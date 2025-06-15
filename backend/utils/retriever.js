@@ -1,7 +1,10 @@
 import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
 import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/huggingface_transformers";
 import { createClient } from "@supabase/supabase-js";
-
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+dotenv.config();
 const openAIApiKey = process.env.OPENAI_API_KEY;
 const sbApiKey = process.env.SP_API_KEY;
 const sbUrl = process.env.SP_URL;

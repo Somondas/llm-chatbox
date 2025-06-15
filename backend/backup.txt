@@ -10,12 +10,16 @@ import { StringOutputParser } from "@langchain/core/output_parsers";
 import { resolve } from "path";
 import { retriever } from "./utils/retriever.js";
 import combineDocuments from "./utils/combileDocuments.js";
+import {
+  RunnableSequence,
+  RunnablePassthrough,
+} from "@langchain/core/runnables";
 
 // >> Starter Code --------------------
-// document.addEventListener("submit", (e) => {
-//   e.preventDefault();
-//   progressConversation();
-// });
+document.addEventListener("submit", (e) => {
+  e.preventDefault();
+  progressConversation();
+});
 
 // -> ENVs---------------------------------------
 const openAIApiKey = process.env.OPENAI_API_KEY;
@@ -50,26 +54,28 @@ const answerPrompt = PromptTemplate.fromTemplate(answerTemplate);
 
 const standaloneQuestionChain = standaloneQuestionPrompt
   .pipe(llm)
-  .pipe(new StringOutputParser())
-  .pipe(retriever)
-  .pipe(combineDocuments);
+  .pipe(new StringOutputParser());
 
-const response = await standaloneQuestionChain.invoke({
-  question:
-    "I have heard about Soman so much, who this guy is anyway? and how strong is he?",
-});
-console.log(response);
+const retriverChain = RunnableSequence.from([
+  (prevResult) => prevResult.standalone_question,
+  retriever,
+  combineDocuments,
+]);
+const answerChain = answerPrompt.pipe(llm).pipe(new StringOutputParser());
+
+const chain = RunnableSequence.from([
+  {
+    standalone_question: standaloneQuestionChain,
+    original_input: new RunnablePassthrough(),
+  },
+  {
+    context: retriverChain,
+    question: ({ original_input }) => original_input.question,
+  },
+  answerChain,
+]);
 
 // ? Test Code -------------------------------------
-
-// -> Test code 2 -----------------------------
-
-const chain = standaloneQuestionPrompt
-  .pipe(llm)
-  .pipe(new StringOutputParser().pipe(retriever))
-  .pipe(answerPrompt);
-
-// -> Test code 2 -----------------------------
 
 async function progressConversation() {
   const userInput = document.getElementById("user-input");
@@ -85,12 +91,15 @@ async function progressConversation() {
   chatbotConversation.appendChild(newHumanSpeechBubble);
   newHumanSpeechBubble.textContent = question;
   chatbotConversation.scrollTop = chatbotConversation.scrollHeight;
+  const response = await chain.invoke({
+    question: question,
+  });
 
   // add AI message
   const newAiSpeechBubble = document.createElement("div");
   newAiSpeechBubble.classList.add("speech", "speech-ai");
   chatbotConversation.appendChild(newAiSpeechBubble);
-  newAiSpeechBubble.textContent = result;
+  newAiSpeechBubble.textContent = response;
   chatbotConversation.scrollTop = chatbotConversation.scrollHeight;
 }
 // >> Starter Code End----------------------------------------
