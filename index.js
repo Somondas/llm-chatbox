@@ -1,19 +1,75 @@
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { readFile } from "fs/promises";
-import { createClient } from "@supabase/supabase-js";
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
-import { OpenAIEmbeddings } from "@langchain/openai";
+
+import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { log } from "console";
 import "dotenv/config";
-import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/huggingface_transformers";
+
+import { PromptTemplate } from "@langchain/core/prompts";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { resolve } from "path";
+import { retriever } from "./utils/retriever.js";
+import combineDocuments from "./utils/combileDocuments.js";
 
 // >> Starter Code --------------------
-document.addEventListener("submit", (e) => {
-  e.preventDefault();
-  progressConversation();
+// document.addEventListener("submit", (e) => {
+//   e.preventDefault();
+//   progressConversation();
+// });
+
+// -> ENVs---------------------------------------
+const openAIApiKey = process.env.OPENAI_API_KEY;
+const sbApiKey = process.env.SP_API_KEY;
+const sbUrl = process.env.SP_URL;
+const groqApiKey = process.env.GROQ_API_KEY;
+
+// >> LLM---------
+const llm = new ChatOpenAI({
+  apiKey: groqApiKey,
+  configuration: {
+    baseURL: "https://api.groq.com/openai/v1", // 👈 this is required
+  },
+  model: "llama3-70b-8192", // ✅ Use one of Groq’s supported models
 });
 
-const openAIApiKey = process.env.OPENAI_API_KEY;
+// ? Test Code -------------------------------------
+
+const standaloneQuestionTemplate =
+  "Generate a standalone question from the given question: {question}";
+
+const standaloneQuestionPrompt = PromptTemplate.fromTemplate(
+  standaloneQuestionTemplate
+);
+
+const answerTemplate = `You are a helpful and enthusiastic support bot who can answer a given question about Scrimba based on the context provided. Try to find the answer in the context. If you really don't know the answer, say "I'm sorry, I don't know the answer to that." And direct the questioner to email help@knowsoman.com. Don't try to make up an answer. Alaways speak as if you were chatting to a friend.
+context: {context}
+question: {question}
+answer:
+`;
+const answerPrompt = PromptTemplate.fromTemplate(answerTemplate);
+
+const standaloneQuestionChain = standaloneQuestionPrompt
+  .pipe(llm)
+  .pipe(new StringOutputParser())
+  .pipe(retriever)
+  .pipe(combineDocuments);
+
+const response = await standaloneQuestionChain.invoke({
+  question:
+    "I have heard about Soman so much, who this guy is anyway? and how strong is he?",
+});
+console.log(response);
+
+// ? Test Code -------------------------------------
+
+// -> Test code 2 -----------------------------
+
+const chain = standaloneQuestionPrompt
+  .pipe(llm)
+  .pipe(new StringOutputParser().pipe(retriever))
+  .pipe(answerPrompt);
+
+// -> Test code 2 -----------------------------
 
 async function progressConversation() {
   const userInput = document.getElementById("user-input");

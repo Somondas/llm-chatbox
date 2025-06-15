@@ -13,12 +13,13 @@ const llm = new ChatOpenAI({
 });
 
 const tweetTemplate =
-  "Generate a promotional tweet for a product, from this product description: {productDesc}";
+  "Generate a standalone question from the given question: {productDesc}";
 
 const tweetPrompt = PromptTemplate.fromTemplate(tweetTemplate);
 
 const formatted = await tweetPrompt.format({
-  productDesc: "A zero-sugar energy drink that boosts your focus instantly.",
+  productDesc:
+    "Some shirts fits on me while others don't, so can I know the return policy of the shop, so that everything runs smoothly?",
 });
 
 const result = await llm.invoke(formatted);
